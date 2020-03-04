@@ -110,4 +110,111 @@ describe("eval", () => {
 		// Fails because of wrong block range
 		assert.equal(await gasEval.getContractDeploymentTransactionAddr(votingContractAddress, 3), null, "Should fail because of wrong block range");
 	});
+
+	it("should find the gas costs of the deployment of a smart contract", async () => {
+		const web3Local = new Web3(ganache.provider());
+		const gasEval = new EthereumGasEval(web3Local);
+		
+		const votingContract = new web3Local.eth.Contract(VotingContract.json);
+
+		const ganacheAccounts = await web3Local.eth.getAccounts();
+
+		let deployableContract = await votingContract.deploy({
+			data: VotingContract.data
+		});
+		
+		let deployedContract = await deployableContract.send({
+			from: ganacheAccounts[0],
+			gas: 1500000,
+		});
+
+		let votingContractAddress = deployedContract.options.address;
+
+		deployedContract = new web3Local.eth.Contract(VotingContract.json, votingContractAddress);
+		
+		let txCosts = await gasEval.getContractDeploymentGasCosts(votingContractAddress);
+		assert(Number.isInteger(txCosts) && txCosts > 100, "Did not find gas costs for the deployment of a given smart contract");
+
+		// Execute some more transactions 
+		for(let i = 0; i < 5; i++) {
+			await deployedContract.methods.assignVoting(ganacheAccounts[i + 1]).send({
+				from: ganacheAccounts[0],
+				gas: 1500000,
+			});
+		}
+
+		let txCosts2 = await gasEval.getContractDeploymentGasCosts(votingContractAddress);
+		assert(Number.isInteger(txCosts2) && txCosts == txCosts2, "Did not find gas costs for the deployment of a given smart contract after additional transactions");
+	});
+
+	it("should find block number and use it for gas cost eval w/o querying all blocks again", async () => {
+		const web3Local = new Web3(ganache.provider());
+		const gasEval = new EthereumGasEval(web3Local);
+		
+		const votingContract = new web3Local.eth.Contract(VotingContract.json);
+
+		const ganacheAccounts = await web3Local.eth.getAccounts();
+
+		const deployableContract = await votingContract.deploy({
+			data: VotingContract.data
+		});
+		
+		const deployedContract = await deployableContract.send({
+			from: ganacheAccounts[0],
+			gas: 1500000,
+		});
+
+		let votingContractAddress = deployedContract.options.address;
+
+		// Execute some more transactions 
+		for(let i = 0; i < 5; i++) {
+			await deployedContract.methods.assignVoting(ganacheAccounts[i + 1]).send({
+				from: ganacheAccounts[0],
+				gas: 1500000,
+			});
+		}
+
+		const blockNum = await gasEval.getContractDeploymentBlockNum(votingContractAddress);
+		assert.equal(blockNum, 1, "Block num should be 1");
+
+		const txAddress = await gasEval.getContractDeploymentTransactionAddr(votingContractAddress, blockNum, blockNum);
+		assert.equal(txAddress.toLowerCase(), votingContractAddress.toLowerCase(), "TX addresses should be the same");
+	});
+
+	it("should sum up deployment and TXs gas", async () => {
+		const web3Local = new Web3(ganache.provider());
+		const gasEval = new EthereumGasEval(web3Local);
+		
+		const votingContract = new web3Local.eth.Contract(VotingContract.json);
+
+		const ganacheAccounts = await web3Local.eth.getAccounts();
+
+		const deployableContract = await votingContract.deploy({
+			data: VotingContract.data
+		});
+		
+		const deployedContract = await deployableContract.send({
+			from: ganacheAccounts[0],
+			gas: 1500000,
+		});
+
+		const votingContractAddress = deployedContract.options.address;
+
+		const gasSumAfterDeployment = await gasEval.getContractGasCosts(votingContractAddress);
+
+		let gasAssertion = gasSumAfterDeployment;
+
+		// Execute some more transactions 
+		for(let i = 0; i < 5; i++) {
+			await deployedContract.methods.assignVoting(ganacheAccounts[i + 1]).send({
+				from: ganacheAccounts[0],
+				gas: 1500000,
+			});
+
+			const gasSumAfterNewTransaction = await gasEval.getContractGasCosts(votingContractAddress);
+			assert(gasAssertion < gasSumAfterNewTransaction, "Gas costs sum should get higher with more transactions");
+
+			gasAssertion = gasSumAfterNewTransaction;
+		}
+	});
 });
