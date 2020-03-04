@@ -2,9 +2,14 @@ Ethereum Gas Eval
 ===================
 
 This package takes an address of a deployed smart contract, queries all transactions since its deployment, and sums up all gas costs.
-It uses [web3.js](https://github.com/ethereum/web3.js) for accessing the blockchain which leads to some performance issues. 
-Unfortunately, it's not possible to just get the transaction which deployed the contract by a standard command, so Web3 has to check all blocks for the deployment.
+It uses [web3.js](https://github.com/ethereum/web3.js) for accessing the blockchain which leads to serious performance issues.
+Unfortunately, it's not possible to just get the transaction which deployed the contract by a single command, so it has to check all blocks for the deployment block for block.
 The same problem with finding transactions to the smart contract.
+For speeding analysis up you can specify the range of blocks.
+
+Another problem is that only smart contracts created by transcations with ```to = 0``` can be evaluated.
+It is also possible to create smart contracts in Ethereum with the EVM command ```CREATE2```, but finding such created smart contracts would need to execute and monitor all transaction commands.
+It's the same problem with internal smart contract transactions.
 
 ## Functions
 - ```getContractGasCosts = async (contractAddress, fromBlock = 0, toBlock = "latest")```
@@ -14,16 +19,16 @@ The same problem with finding transactions to the smart contract.
   It returns ```null``` if the smart contract could not be found or throws an exception.
 
 - ```EthereumGasEval.getContractDeploymentBlockNum = async (contractAddress, fromBlock = 0, toBlock = "latest")```
-  
+
   Queries the block number in which a smart contract was deployed by the contracts address.
   It returns ```null``` if the corresponding block could not be found or throws an exception.
 
 - ```EthereumGasEval.getContractDeploymentTransactionAddr = async (contractAddress, fromBlock = 0, toBlock = "latest")```
-  
+
   Queries the transaction address in which a smart contract was deployed by the contracts address.
   It returns ```null``` if the corresponding transaction could not be found or throws an exception.
 
-## Example: Query the gas costs of the deployment of a smart contract and alls transactions to it by the smart contracts address 
+## Example: Query the gas costs of the deployment of a smart contract and alls transactions to it by the smart contracts address
 
 ```
 const Web3 = require("web3);
@@ -36,7 +41,7 @@ let deploymentAndTXsGas = ethereumGasEval.getContractGasCosts("0x012345679012345
 console.log(deploymentAndTXsGas + " wei");
 ```
 
-## Example: Query the gas costs of the deployment of a smart contract by the smart contracts address 
+## Example: Query the gas costs of the deployment of a smart contract by the smart contracts address
 
 ```
 const Web3 = require("web3);
